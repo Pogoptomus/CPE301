@@ -1,0 +1,49 @@
+//Task1 C code
+#include <avr/io.h>
+//for the counter we want (1MHz/1024 *0.25)-1 = 243
+int main()
+{
+	DDRB = 0x04;				    // set PB2 to output
+	PORTB = 0x00;           // clear all of PORTB
+	TCCR1B = 5;             // set prescaler to 1024
+	while(1) {
+		if(TCNT1 == 0x00F3){  // when counter = 243
+			PORTB ^= 0x04;      // toggle the LED
+			TCNT1 = 0x00;       // reset the counter
+		}
+	}
+}
+
+//=======================================
+//************ asembly code *************
+//=======================================
+.org 0 
+	ldi R16,low(RAMEND) 
+	out SPL,R16 
+	ldi R16,high(RAMEND) 
+	out SPH,R16
+    SBI DDRB, 2       ; set PB2 as output
+    LDI R16, 0
+    OUT PORTB, R16    ; set all of PORTB to zero. start LED off
+    LDI R17, 5
+    STS TCCR1B, R17   ; set timer 1 prescaler to 1024
+    LDI R17, 4        ; used to XOR with R16 to toggle LED
+
+begin:
+    RCALL delay
+    EOR R16, R17
+    OUT PORTB, R16
+    RJMP begin
+
+delay:
+	LDS R18, TCNT1L
+    CPI R18, 0xF3
+    BRSH done    ; check to see if TCNT1 = 0xF3
+    RJMP delay
+
+done:
+    LDI R18, 0x00
+    STS TCNT1H, R18
+    LDI R18, 0x00
+  	STS TCNT1L, R18
+    RET
