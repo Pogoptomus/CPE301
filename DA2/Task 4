@@ -29,39 +29,34 @@ int main()
 
 .org 0
 	rjmp start
-.org OVF1addr
-    rjmp  timer1ovf
+.org OVF0addr
+    rjmp  timer0ovf
 
 start:
   	ldi		R16,low(RAMEND) 
   	out		SPL,R16 
   	ldi		R16,high(RAMEND) 
   	out		SPH,R16
-    SBI		DDRD, 2			; set PD2 as output
-    LDI		R16, 0
-    OUT		PORTD, R16		; set all of PORTD to zero. start LED off
-    LDI		R17, 5
-    STS		TCCR1B, R17		; set timer 0 prescaler to 1024
+    	SBI		DDRB, 2			; set PD2 as output
+    	LDI		R16, 0
+    	OUT		PORTB, R16		; set all of PORTD to zero. start LED off
+    	LDI		R17, 5
+    	OUT		TCCR0B, R17		; set timer 0 prescaler to 1024
 	LDI		R17, 1
-	STS		TIMSK1, R17		; enable the overflow interrupt
-    LDI		R17, 4			; used to XOR with R16 to toggle   
-    LDI		R18, 0XFC     
-    STS		TCNT1H, R18		; set TCNT1H to 0xFC, loading TCNT1 to 64559
-    LDI		R18, 0x2f
-    STS		TCNT1L, R18		; set TCNT1L to 0x2F
-    SEI
+	STS		TIMSK0, R17		; enable the overflow interrupt
+	LDI		R17, 4			; used to XOR with R16 to toggle   
+    	LDI		R18, 0X0B     
+    	OUT		TCNT0, R18		; set TCNT0 to 0x0B, loading TCNT0 to 11
+    	SEI
 wait:
 	
-    Rjmp wait
+    	Rjmp wait
             ; **************************
             ; timer1 overflow subroutine
             ; **************************
-timer1ovf:
-    EOR   R16, R17
-    OUT   PORTD, R16
-    LDI   R18, 0XFC     
-    LDI   R19, 0x2F
-    STS   TCNT1H, R18		; set TCNT1H to 0xFC, reloading TCNT1 with 64559
-    STS   TCNT1L, R19		; set TCNT1L to 0x2F
-
-    RETI
+timer0ovf:
+    	EOR   R16, R17
+    	OUT   PORTB, R16			; toggle LED
+    	LDI   R18, 0X0B     
+    	OUT   TCNT0, R18			; set TCNT0 to 0x0B, reloading TCNT0 to 11
+    	RETI
