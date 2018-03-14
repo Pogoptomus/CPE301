@@ -1,0 +1,54 @@
+////// C code ////////
+
+#include <avr/io.h>
+
+int main(void){
+	DDRB = 0x04;              // set PB2 as output
+	PORTB = 0x00;             // set all of PORTB to zero. start LED off
+	TCCR0B = 0x05;            // set timer 0 prescaler to 2014
+	while(1)
+	{
+		if(TCNT0 == 0xF3){  // when counter = 243
+			PORTB ^= 0x04;      // toggle the LED
+			TCNT0 = 0x00;       // reset the counter
+		}
+	}
+}
+
+
+
+////// assembly code ////////
+
+.org 0
+    SBI DDRB, 2       ; set PB2 as output
+    LDI R16, 0
+    OUT PORTB, R16    ; set all of PORTB to zero. start LED off
+    LDI R17, 5
+    STS TCCR0B, R17   ; set timer 0 prescaler to 1024
+    LDI R17, 4        ; used to XOR with R16 to toggle LED
+
+begin:
+    RCALL delay
+    EOR R16, R17
+    OUT PORTB, R16
+    RJMP begin
+
+delay1:
+    LDS R18, TCNT0
+    CPI R18, 0xF3
+    BRSH overflow     ; check to see if TCNT0 = 255
+    RJMP delay1
+
+overflow:
+    LDI R18, 0x00
+    STS TCNT0, R18    ; reset TCNT0
+delay2:
+    LDS R18, TCNT0
+    CPI R18, 0xE8     ;check to see if TCNT0 = 232, making total time 487
+    BRSH done
+    
+
+done:
+    LDI R18, 0x00
+    STS TCNT0, R18
+    RET
