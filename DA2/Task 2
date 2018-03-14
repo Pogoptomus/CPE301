@@ -33,28 +33,29 @@ int main(void)
 	out SPL,R16 
 	ldi R16,high(RAMEND) 
 	out SPH,R16
-    SBI DDRB, 2       ; set PB2 as output
-    LDI R16, 0
-    OUT PORTB, R16    ; set all of PORTB to zero. start LED off
-	LDI R17, 5
-	STS TCCR1B, R17
-	LDI R17, 4		  ; use R17 to AND with R16 to determin if bit 2 is 1
+    	SBI DDRB, 2      	; set PB2 as output
+    	LDI R16, 0x00
+    	OUT PORTB, R16    	; set all of PORTB to zero. start LED off
+	LDI R17, 0x05
+	STS TCCR1B, R17		; set prescaler to 1024. timer used for 1 second delay
+	LDI R17, 0x04		; use R17 to AND with R16 to determin if bit 2 is 1
 
 begin:
-	LDS R16, PORTD
-	AND R16, R17	  
-	BREQ blink		  ; if PD2 is 1 then branch to led blink
+	IN R16, PIND
+	AND R16, R17		; mask R16 with 0x04 to see if we have a button push
+	CPI R16, 0x04	  
+	BREQ blink		; if PD2 is 1 then branch to led blink
 	RJMP begin
 
 blink: 
 	LDI R18, 4
-	OUT PORTB, R18
+	OUT PORTB, R18		; turn on LED
 	LDI R18, 0
 	STS TCNT1H, R18
-	STS TCNT1L, R18	  ; reset timer 1 to use for a 1 second delay
+	STS TCNT1L, R18	  	; reset timer 1 to use for a 1 second delay
 
 delay:
-	LDS R18, TCNT1L
+	LDS R18, TCNT1L		; run through loop for 1 second
 	LDS R19, TCNT1H
 	CPI R18, 0XCF
 	BRSH delay2
@@ -66,6 +67,6 @@ delay2:
 	RJMP delay
 
 turnoff:
-	LDI R18, 0
+	LDI R18, 0		; once the second is up, turn off led
 	OUT PORTB, R18
-	RJMP begin
+	RJMP begin		; loop back to begining
