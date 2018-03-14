@@ -1,0 +1,71 @@
+#include <avr/io.h>
+#include <util/delay.h>
+
+int main(void)
+{
+	DDRB = 0x04;							//set pin PB2 to output, using PD2 as input, which is autoset, so no change needed
+	
+	while (1)
+	{
+		if ((PIND&0x04) == 4)				// if PD2 is high	
+		{
+			PORTB = 0x04;					// turn on LED
+			for (int i = 0; i < 10; i++)
+			{
+				_delay_ms(100);				// use 10 100ms delays to get a 1 second delay
+			}
+			PORTB = 0x00;
+			while((PIND&0x04) == 4)			// if button is still depressed, wait until released to start again
+			{}
+		}
+		else
+			PORTB = 0x00;
+	}
+}
+
+
+//=======================================
+//************ asembly code *************
+//=======================================
+
+.org 0 
+	ldi R16,low(RAMEND) 
+	out SPL,R16 
+	ldi R16,high(RAMEND) 
+	out SPH,R16
+    SBI DDRB, 2       ; set PB2 as output
+    LDI R16, 0
+    OUT PORTB, R16    ; set all of PORTB to zero. start LED off
+	LDI R17, 5
+	STS TCCR1B, R17
+	LDI R17, 4		  ; use R17 to AND with R16 to determin if bit 2 is 1
+
+begin:
+	LDS R16, PORTD
+	AND R16, R17	  
+	BREQ blink		  ; if PD2 is 1 then branch to led blink
+	RJMP begin
+
+blink: 
+	LDI R18, 4
+	OUT PORTB, R18
+	LDI R18, 0
+	STS TCNT1H, R18
+	STS TCNT1L, R18	  ; reset timer 1 to use for a 1 second delay
+
+delay:
+	LDS R18, TCNT1L
+	LDS R19, TCNT1H
+	CPI R18, 0XCF
+	BRSH delay2
+	RJMP delay
+
+delay2:
+	CPI R19, 0x03
+	BRSH turnoff
+	RJMP delay
+
+turnoff:
+	LDI R18, 0
+	OUT PORTB, R18
+	RJMP begin
