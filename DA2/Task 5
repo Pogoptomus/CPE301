@@ -27,3 +27,65 @@ int main(void)
 
 
 //Assembly code
+.org 0
+	rjmp start
+.org INT0addr
+    rjmp  interupt0
+
+start:
+  	ldi		R16,low(RAMEND) 
+  	out		SPL,R16 
+  	ldi		R16,high(RAMEND) 
+  	out		SPH,R16
+    SBI		DDRB, 2			; set PD2 as output
+    LDI		R16, 0
+    OUT		PORTB, R16		; set all of PORTD to zero. start LED off
+	LDI		R16, 1
+	OUT		EIMSK, R16		; set interrupt0 mask
+	OUT		EIFR, R16		; set interupt0 flag
+	LDI		R16, 4
+	STS		EICRA, R16		; set interrupt control register to rising edge
+	LDI		R16, 5
+	OUT		TCCR0B, R16			; set timer 0 prescaler to 1024. timer used for 1 second delay
+    SEI
+wait:
+	
+    Rjmp wait
+            ; **************************
+            ; interrupt0 subroutine
+            ; **************************
+
+interupt0:
+	LDI		R16, 4
+    OUT		PORTB, R16
+	LDI		R16, 0
+	OUT		TCNT0, R16		; reset timer for delay
+	LDI		R17, 0
+
+; since timer0 is 8 bit, and we need total value of 975 multiple loops are needed.
+; using r17 as a counter, when 255 has been reached 3 times (765) 
+; go to a final loop for the last 210 counts
+delay:
+	IN		R18, TCNT0
+	CPI		R18, 0XFF
+	BRSH	checkcount 
+	RJMP	delay    
+
+checkcount:
+	LDI		R16, 0			
+	OUT		TCNT0, R16		; reset timer for the rest of delay
+	LDI		R16, 1
+	ADD		R17, R16
+	CPI		R17, 3
+	BREQ	delay
+	
+delay2:
+	IN		R18, TCNT0
+	CPI		R18, 0xD2
+	BRSH	turnoff
+	RJMP	delay2
+
+turnoff:
+	LDI		R18, 0
+	OUT		PORTB, R18
+	RETI
