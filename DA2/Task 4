@@ -1,0 +1,67 @@
+//c code
+
+// to get a .5 second blink needs timer to count to 487,
+// with only 8 bits, will need cut in half (244) for each overflow
+// then using a global variable to indicate if an overflow has already
+// occured for the particular cycle. if it has, toggle the LED
+
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/interrupt.h>
+
+ISR(TIMER0_OVF_vect)
+{
+	PORTB ^= 0xFF;			// toggle LED
+	TCNT0 = 0x0B ;			// reset counter
+}
+
+int main()
+{
+	DDRB = 0x04;			// set PD2 to output
+	TIMSK0 = (1 << TOIE1);	// enable timer1 interrupt
+	TCCR0B = 5;				// set prescaler to 1024
+	TCNT0 = 0x0B;			// set timer to 255- 244 = 11
+	sei();					// enable global interrupt
+	while(1) {}
+}
+
+// assembly code        /////////////////////
+
+.org 0
+	rjmp start
+.org OVF1addr
+    rjmp  timer1ovf
+
+start:
+  	ldi		R16,low(RAMEND) 
+  	out		SPL,R16 
+  	ldi		R16,high(RAMEND) 
+  	out		SPH,R16
+    SBI		DDRD, 2			; set PD2 as output
+    LDI		R16, 0
+    OUT		PORTD, R16		; set all of PORTD to zero. start LED off
+    LDI		R17, 5
+    STS		TCCR1B, R17		; set timer 0 prescaler to 1024
+	LDI		R17, 1
+	STS		TIMSK1, R17		; enable the overflow interrupt
+    LDI		R17, 4			; used to XOR with R16 to toggle   
+    LDI		R18, 0XFC     
+    STS		TCNT1H, R18		; set TCNT1H to 0xFC, loading TCNT1 to 64559
+    LDI		R18, 0x2f
+    STS		TCNT1L, R18		; set TCNT1L to 0x2F
+    SEI
+wait:
+	
+    Rjmp wait
+            ; **************************
+            ; timer1 overflow subroutine
+            ; **************************
+timer1ovf:
+    EOR   R16, R17
+    OUT   PORTD, R16
+    LDI   R18, 0XFC     
+    LDI   R19, 0x2F
+    STS   TCNT1H, R18		; set TCNT1H to 0xFC, reloading TCNT1 with 64559
+    STS   TCNT1L, R19		; set TCNT1L to 0x2F
+
+    RETI
