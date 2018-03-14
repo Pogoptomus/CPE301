@@ -20,35 +20,26 @@ int main(void){
 ////// assembly code ////////
 
 .org 0
-    SBI DDRB, 2       ; set PB2 as output
+    SBI DDRB, 2			; set PB2 as output
     LDI R16, 0
-    OUT PORTB, R16    ; set all of PORTB to zero. start LED off
+    OUT PORTB, R16		; set all of PORTB to zero. start LED off
     LDI R17, 5
-    STS TCCR0B, R17   ; set timer 0 prescaler to 1024
-    LDI R17, 4        ; used to XOR with R16 to toggle LED
+    OUT TCCR0B, R17		; set timer 0 prescaler to 1024
+    LDI R17, 4			; used to XOR with R16 to toggle LED
 
 begin:
-    RCALL delay
-    EOR R16, R17
+    RCALL delay			; jump into the delay loop
+    EOR R16, R17		; toggle the LED
     OUT PORTB, R16
-    RJMP begin
+    RJMP begin			; loop. forever.
 
-delay1:
-    LDS R18, TCNT0
+delay:
+    IN R18, TCNT0
     CPI R18, 0xF3
-    BRSH overflow     ; check to see if TCNT0 = 255
-    RJMP delay1
-
-overflow:
-    LDI R18, 0x00
-    STS TCNT0, R18    ; reset TCNT0
-delay2:
-    LDS R18, TCNT0
-    CPI R18, 0xE8     ;check to see if TCNT0 = 232, making total time 487
-    BRSH done
-    
+    BRSH done			; check to see if TCNT0 = 243
+    RJMP delay
 
 done:
     LDI R18, 0x00
-    STS TCNT0, R18
+    OUT TCNT0, R18
     RET
