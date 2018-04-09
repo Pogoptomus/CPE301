@@ -1,1 +1,122 @@
+#define F_CPU 1600000
+#define BAUD 115200		//
+#define MYUBRR F_CPU/16/BAUD-1
 
+#include <avr/io.h>
+#include <util/delay.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <avr/interrupt.h>
+
+void read_adc(void); // Function Declarations
+void adc_init(void);
+void USART_init( unsigned int ubrr );
+void USART_tx_string( char *data );
+void send_AT(char *message);
+volatile unsigned int Ctemp;
+volatile unsigned int Ftemp;
+
+unsigned char interface_var = 0;
+unsigned char counter[34];
+unsigned char var = 0;
+char outs[20];
+
+ISR(TIMER1_OVF_vect){
+	read_adc();
+	snprintf(outs,sizeof(outs),"%3d\r\n", Ftemp);//	print	it
+	send_AT(outs);
+	TCNT1 = 0xC2F7;
+}
+
+int main(void) {
+	char *AT = "AT\r\n";
+	char *CIPMUX = "AT+CIPMUX=0\r\n";
+	char *CIPMODE = "AT+CIPMODE=0";
+	char *WIFI =  "AT+CWJAP=\"Sebarial\",\"ilikepie\"";
+	char *CIPSTART = "AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n";\
+	char *CIPSEND = "AT+CIPSEND=110\r\n";
+	// *char *GET_DATA = "GET https://api.thingspeak.com/channels/467469/fields/1.json?api_key=5XK29LUTFJ8N7DSU&results=2\r\n";
+	char *SEND_DATA = "GET https://api.thingspeak.com/update?api_key=KO3SS1STNRQA4VJI&field1=1\r\n";
+	adc_init(); // Initialize the ADC (Analog / Digital Converter)
+	USART_init(MYUBRR); // Initialize the USART (RS232 interface)
+	_delay_ms(500);
+	sei();
+	_delay_ms(200);
+	send_AT(AT);
+	_delay_ms(6000);
+	send_AT(CIPMUX);
+	_delay_ms(6000);
+	send_AT(CIPMODE);
+	_delay_ms(6000);
+	send_AT(WIFI);
+	_delay_ms(6000);
+	send_AT(CIPSTART);
+	_delay_ms(6000);
+	send_AT(CIPSEND);
+	_delay_ms(6000);
+	send_AT(SEND_DATA);
+	_delay_ms(16000);
+	while(1){}
+}
+
+void adc_init(void)
+{
+	/** Setup and enable ADC **/
+	ADMUX =
+	(1<<REFS1)| // Reference Selection Bits
+	(1<<REFS0)| // AVcc - external cap at AREF
+	(0<<ADLAR)| // ADC Left Adjust Result
+	(1<<MUX3)|
+	(0<<MUX2)| // ANalog Channel Selection Bits
+	(0<<MUX1)| // ADC8 (for Temperature Sensor)
+	(0<<MUX0);
+
+	ADCSRA =
+	(1<<ADEN)| // ADC ENable
+	(1<<ADSC)| // ADC Start Conversion
+	(0<<ADATE)| // ADC Auto Trigger Enable
+	(0<<ADIF)| // ADC Interrupt Flag
+	(0<<ADIE)| // ADC Interrupt Enable
+	(1<<ADPS2)| // ADC Prescaler Select Bits
+	(1<<ADPS1)|
+	(0<<ADPS0);
+
+	TIMSK1 = (1<<TOIE1);				// set timer overflow interrupt
+	TCCR1B |= (1<<CS12)|(1<<CS10);	//	native	clock
+	TCNT1 = 0xC2F7;						// for 1 second delay with 16MHz clock, tcnt1 = 15624, thus 65535 - 15624 = 49911 (0xC2F7)
+}
+
+/* READ ADC PINS */
+void read_adc(void) {
+	while(ADCSRA & (1<<ADSC));
+	Ctemp = (ADC - 247)/1.22;
+	Ftemp = (Ctemp * 1.8) + 32;
+}
+
+/* INIT USART (RS-232) */
+void USART_init( unsigned int ubrr ) {
+	UBRR0H = (unsigned char)(ubrr>>8);
+	UBRR0L = (unsigned char)ubrr;
+	UCSR0B = (1 << TXEN0)|
+	(1<<RXEN0)|
+	(1<<RXCIE0); // Enable receiver, transmitter & RX interrupt
+	UCSR0C = (1<<UCSZ01)|
+	(1<<UCSZ00); //asynchronous 8 N 1
+}
+
+/* SEND A STRING TO THE RS-232 */
+void USART_tx_string( char *data ) {
+	while ((*data != '\0')) {
+		while (!(UCSR0A & (1 <<UDRE0)));
+		UDR0 = *data;
+		data++;
+	}
+}
+
+void send_AT(char *message)
+{
+	while(*message != '\0')
+	{
+		USART_tx_string(message); // This sends data to esp
+	}
+}
