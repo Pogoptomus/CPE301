@@ -1,0 +1,84 @@
+#define F_CPU 1600000UL
+#define BAUD 9600
+#define MYUBRR F_CPU/16/BAUD-1
+
+#include <avr/io.h>
+#include <util/delay.h>
+#include <stdio.h>
+#include <avr/interrupt.h>
+void read_adc(void); // Function Declarations
+void adc_init(void);
+void USART_init( unsigned int ubrr );
+void USART_tx_string( char *data );
+volatile unsigned int adc_temp;
+char outs[20];
+
+ISR(TIMER1_OVF_vect){
+	read_adc();
+	snprintf(outs,sizeof(outs),"%3d\r\n", adc_temp);//	print	it
+	USART_tx_string(outs);
+	TCNT1 = 0xC2F7;
+}
+
+int main(void) {
+	adc_init(); // Initialize the ADC (Analog / Digital Converter)
+	USART_init(MYUBRR); // Initialize the USART (RS232 interface)
+	USART_tx_string("Connected!\r\n"); // we're alive!
+	sei();
+	while(1)
+	{}
+}
+
+void adc_init(void)
+{
+	/** Setup and enable ADC **/
+	ADMUX = (0<<REFS1)| // Reference Selection Bits
+	(1<<REFS0)| // AVcc - external cap at AREF
+	(0<<ADLAR)| // ADC Left Adjust Result
+	(0<<MUX2)| // ANalog Channel Selection Bits
+	(0<<MUX1)| // ADC2 (PC2 PIN25)
+	(0<<MUX0);
+
+	ADCSRA = (1<<ADEN)| // ADC ENable
+	(0<<ADSC)| // ADC Start Conversion
+	(0<<ADATE)| // ADC Auto Trigger Enable
+	(0<<ADIF)| // ADC Interrupt Flag
+	(0<<ADIE)| // ADC Interrupt Enable
+	(1<<ADPS2)| // ADC Prescaler Select Bits
+	(0<<ADPS1)|
+	(1<<ADPS0);
+	
+	TIMSK1 = (1<<TOIE1);	// set timer overflow interrupt
+	TCCR1B	|=	(1<<CS12)|(1<<CS10);	//	native	clock
+	TCNT1 = 0xC2F7;			// for 1 second delay with 16MHz clock, tcnt1 = 15624, thus 65535 - 15624 = 49911 (0xC2F7)
+}
+
+/* READ ADC PINS */
+void read_adc(void) {
+	unsigned char i =4;
+	adc_temp = 0;
+	while (i--) {
+		ADCSRA |= (1<<ADSC);
+		while(ADCSRA & (1<<ADSC));
+		adc_temp+= ADC;
+		_delay_ms(50);
+	}
+	adc_temp = adc_temp / 4; // Average a few samples
+
+}
+
+/* INIT USART (RS-232) */
+void USART_init( unsigned int ubrr ) {
+	UBRR0H = (unsigned char)(ubrr>>8);
+	UBRR0L = (unsigned char)ubrr;
+	UCSR0B = (1 << TXEN0); // Enable receiver, transmitter & RX interrupt
+	UCSR0C = (3 << UCSZ00); //asynchronous 8 N 1
+}
+/* SEND A STRING TO THE RS-232 */
+void USART_tx_string( char *data ) {
+	while ((*data != '\0')) {
+		while (!(UCSR0A & (1 <<UDRE0)));
+		UDR0 = *data;
+		data++;
+	}
+}
