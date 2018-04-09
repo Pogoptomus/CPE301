@@ -16,15 +16,19 @@ void send_AT(char *message);
 volatile unsigned int Ctemp;
 volatile unsigned int Ftemp;
 
-unsigned char interface_var = 0;
-unsigned char counter[34];
-unsigned char var = 0;
-char outs[20];
+char *SEND_DATA;
+char *CIPSEND;
 
 ISR(TIMER1_OVF_vect){
 	read_adc();
-	snprintf(outs,sizeof(outs),"%3d\r\n", Ftemp);//	print	it
-	send_AT(outs);
+	// update send_data to the new value from Ftemp then update CIPSEND to size of SEND_DATA for transmition to thingspeak.
+	snprintf(SEND_DATA,sizeof(SEND_DATA),"GET https://api.thingspeak.com/update?api_key=KO3SS1STNRQA4VJI&field1=%3d\r\n", Ftemp);//	print	it
+	snprintf(CIPSEND, sizeof(CIPSEND), "AT+CIPSEND=%d\r\n", sizeof(SEND_DATA));
+	send_AT(CIPSEND);
+	_delay_ms(6000);
+	send_AT(SEND_DATA);
+	_delay_ms(16000);
+
 	TCNT1 = 0xC2F7;
 }
 
@@ -32,11 +36,11 @@ int main(void) {
 	char *AT = "AT\r\n";
 	char *CIPMUX = "AT+CIPMUX=0\r\n";
 	char *CIPMODE = "AT+CIPMODE=0";
-	char *WIFI =  "AT+CWJAP=\"Sebarial\",\"ilikepie\"";
+	char *WIFI =  "AT+CWJAP=\"<internet>\",\"<password>\"";
 	char *CIPSTART = "AT+CIPSTART=\"TCP\",\"api.thingspeak.com\",80\r\n";\
-	char *CIPSEND = "AT+CIPSEND=110\r\n";
+	//char *CIPSEND = "AT+CIPSEND=110\r\n";
 	// *char *GET_DATA = "GET https://api.thingspeak.com/channels/467469/fields/1.json?api_key=5XK29LUTFJ8N7DSU&results=2\r\n";
-	char *SEND_DATA = "GET https://api.thingspeak.com/update?api_key=KO3SS1STNRQA4VJI&field1=1\r\n";
+	//char *SEND_DATA = "GET https://api.thingspeak.com/update?api_key=KO3SS1STNRQA4VJI&field1=1\r\n"; //
 	adc_init(); // Initialize the ADC (Analog / Digital Converter)
 	USART_init(MYUBRR); // Initialize the USART (RS232 interface)
 	_delay_ms(500);
@@ -52,10 +56,7 @@ int main(void) {
 	_delay_ms(6000);
 	send_AT(CIPSTART);
 	_delay_ms(6000);
-	send_AT(CIPSEND);
-	_delay_ms(6000);
-	send_AT(SEND_DATA);
-	_delay_ms(16000);
+
 	while(1){}
 }
 
@@ -82,7 +83,7 @@ void adc_init(void)
 	(0<<ADPS0);
 
 	TIMSK1 = (1<<TOIE1);				// set timer overflow interrupt
-	TCCR1B |= (1<<CS12)|(1<<CS10);	//	native	clock
+	TCCR1B	|=	(1<<CS12)|(1<<CS10);	//	native	clock
 	TCNT1 = 0xC2F7;						// for 1 second delay with 16MHz clock, tcnt1 = 15624, thus 65535 - 15624 = 49911 (0xC2F7)
 }
 
