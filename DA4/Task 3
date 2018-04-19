@@ -1,0 +1,39 @@
+#define F_CPU 1000000UL
+#include <avr/io.h>
+#include <util/delay.h>
+
+void adc_int(void);
+volatile unsigned int rotate;
+int main(void)
+{
+	DDRD = 0xFF;	
+	TCCR0B=3;
+	TCCR0A=0x83;
+	adc_int();
+	while (1)
+	{
+		while((ADCSRA&(1<<ADIF))==0);
+// for the Servo Motor used (3001HB) I found 0 degree mapped to 0,(I mapped it to 1 however due to it sometimes trying to move too far) 
+// and 180 degree was approxamatly 32. To make the conversion,  divide ADC by 33 and add 1 
+		OCR0A = (ADC /33 +1);
+	}
+}
+
+void adc_int(void){
+	ADMUX = (0<<REFS1)|//	Reference	Selection	Bits
+	(1<<REFS0)|//	AVcc-external	cap	at	AREF
+	(0<<ADLAR)|//	ADC	Left	Adjust	Result
+	(0<<MUX3)|
+	(0<<MUX2)|//	ANalogChannel	Selection	Bits
+	(0<<MUX1)|//	ADC0	(PC0)
+	(0<<MUX0);
+
+	ADCSRA = (1<<ADEN)|//	ADC	ENable
+	(1<<ADSC)|//	ADC	Start	Conversion
+	(1<<ADATE)|//	ADC	Auto	Trigger	Enable
+	(0<<ADIF)|//	ADC	Interrupt	Flag
+	(1<<ADIE)|//	ADC	Interrupt	Enable
+	(1<<ADPS2)|//	ADC	PrescalerSelect	Bits
+	(1<<ADPS1)|
+	(1<<ADPS0);
+}
