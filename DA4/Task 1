@@ -1,0 +1,56 @@
+#define F_CPU 1000000UL
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/interrupt.h>
+
+void adc_int(void);
+volatile unsigned int speed;
+volatile unsigned int stop = 0;
+
+ 
+ISR(INT0_vect){
+	stop ^= 1;			// toggles stop on interrupt
+}
+
+
+int main()
+{
+	DDRD = 0xFB;		// set motor outputs to PD0, PD1. leave PD2 as input for push button.
+	EIMSK = 0x01;		// enable INT0 
+	EIFR = 0x01;		// enable interrupt flag 0
+	EICRA = 0X03;		// set interrupt on rising edge
+	sei();
+	adc_int();
+	TCCR0B=3;			// set prescaler to 1024
+	TCCR0A=0x83;		// set fast PWM and clear OCR0A on match
+	while (1)
+	{
+		while((ADCSRA&(1<<ADIF))==0);
+		speed = ADC*95/400;			// speed equals the conversion for ADC to PWM = adc/4 *.95
+		OCR0A = speed;
+		if(stop == 0){
+			PORTD = 0x01;   // make motor rotate clockwise
+		}
+		else
+			PORTD = 0X00;
+	}
+}
+
+void adc_int(void){
+	ADMUX = (0<<REFS1)|//	Reference	Selection	Bits
+	(1<<REFS0)|//	AVcc-external	cap	at	AREF
+	(0<<ADLAR)|//	ADC	Left	Adjust	Result
+	(0<<MUX3)|
+	(0<<MUX2)|//	ANalogChannel	Selection	Bits
+	(0<<MUX1)|//	ADC0	(PC0)
+	(0<<MUX0);
+
+	ADCSRA = (1<<ADEN)|//	ADC	ENable
+	(1<<ADSC)|//	ADC	Start	Conversion
+	(1<<ADATE)|//	ADC	Auto	Trigger	Enable
+	(0<<ADIF)|//	ADC	Interrupt	Flag
+	(0<<ADIE)|//	ADC	Interrupt	Enable
+	(1<<ADPS2)|//	ADC	PrescalerSelect	Bits
+	(1<<ADPS1)|
+	(1<<ADPS0);
+}
