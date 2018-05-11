@@ -18,12 +18,12 @@ unsigned char USART_Receive(void);
 void USART_Receive_string(char *data);
 int array_check(char *data);
 
-unsigned int stopFlag = 0;		// if this flag is set to 1, begin soft stop 
+unsigned int stopFlag = 0;		// if this flag is set to 1, begin soft stop Not yet implemented
 volatile RingBuffer_t buffer;
 
 ISR(USART_RX_vect){
 	RingBuffer_Insert(&buffer, UDR0);
-//	UDR0 = RingBuffer_Peek(&buffer);
+	UDR0 = RingBuffer_Peek(&buffer);
 }
 
 void main(void)
@@ -37,12 +37,9 @@ void main(void)
 	char outs[10];
 	USART_Init(MYUBRR);
 	sei();
-	//USART_Transmit_string("Set desired motor speed. use s<x> to have motor soft stop in x seconds:\r\n");
+	USART_Transmit_string("Set desired motor speed. use s<x> to have motor soft stop in x seconds:\r\n");
 	while(1)
 	{
-
-//		USART_Receive_string(outs);
-
 		if(RingBuffer_GetCount(&buffer) > 0){
 		  //take entry out of buffer and put into array[element] location to check for command.
 		  // then check for return carriage or new line. if found send array array_check function.
@@ -112,37 +109,6 @@ void USART_Transmit_string(char *data)
 	}
 }
 
-/*
-unsigned char USART_Receive(void)
-{
-	// Wait for data to be received 
-	while ( !(UCSR0A & (1<<RXC0)) );
-	return(UDR0);
-}
-
-void USART_Receive_string(char *data){
-	// store recieved data byte in memory location, then check if new line is reached.
-	// if not increment to the next memory location and repeat
-	//	while ((*data = USART_Receive()) != '\n'){
-	//		*data++;		// increment to the next memory location for the array
-	//	}
-	//once new line reached set last memory value to NULL
-	//	*data = '\0';
-	char send;
-	while(((*data = USART_Receive()) != '\r' )&&(*data != '\n' )){
-		send = *data;
-		USART_Transmit(send);
-		data++;
-	}
-//  add carriage return and new line and null pointer to end of string then perform a carriage return and new line.
-	*data++ = '\r';
-	*data++ = '\n';
-	*data = '\0';
-	USART_Transmit_string("\r\n");
-}
-*/
-//============================================================================================================
-
 // this function is used to check if the data received from USART is an appropriate entry
 // CHECK FOR: 
 // 1. all integer string, if found converts to int and returns.
@@ -154,7 +120,6 @@ int array_check(char *data){
 	// if -1 : ERROR expected format is not found
 	// if 0: all number string. update desired speed
 	// if 1: soft stop requested, second to nth elements contain numerical value determining time to stop
-	//
 	// element0 is a flag to determine if the checked element is the first one
 	// if it is not, and is not a digit then return an error (expected format is not found)
 	// sum is used to verify that the numerical value is valid.
@@ -170,7 +135,6 @@ int array_check(char *data){
 					}
 					if(sum == 0)
 						return -1;	// if the value following "s" is not greater then 0 an invalid command was given
-				
 					// if sum is greater then 0 then the input format is valid
 					return 1;
 				}
@@ -184,11 +148,8 @@ int array_check(char *data){
 			element0 = 0;
 			data++;
 	}
-	
 	if(element0 == 1)
 		return -1;			// this case will only happen if the only data transmitted is enter
-	
 	// if this point is reached it is because all values in the array are digits
 	return 0;
 }
-
